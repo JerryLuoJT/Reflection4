@@ -1,0 +1,85 @@
+---
+title: "week5 Refelction 4"
+Author: "Jingtao Luo, Haoan Wang, Jerry Zhou, Ariel Xing"
+format: pdf
+---
+```{r}
+library(readr)
+library(tidyverse)
+library(knitr)
+clean <-read_csv("cleaned_data.csv")
+raw<-read_csv("usa_00001.csv")
+```
+
+## Instruction 
+
+Instructions for Extracting Data from IPUMS USA
+1. Access the IPUMS USA Website
+  Visit IPUMS USA.
+2. Search for Variables
+   In the search bar, enter the following variables one at a time:
+   EDUC (Education)
+   SEX (Gender)
+   STATEICP (State, using the ICP coding system)
+3. Add Variables to Your Cart
+   After searching for each variable, select it and add it to your cart.
+4. Create Data Extract
+   Once all desired variables are in your cart, proceed to create the data extract.
+5. Change Data Format
+   In the extract request page, select CSV as the data format. This will make it easier for you to work with the data.
+6. Submit Your Request
+   Review your selections and submit the data extract request.
+7. Download Your Data
+   After your request is processed, navigate to the download page at Download Data. Locate your data file, which will be named usa_00001.csv, and download it.
+
+## Overview of Ratio Estimator
+First, we start with the how many respondents have a doctor degree as their highest educational attainment for each state. See "Table 1" for overview.
+```{r}
+#| label: dc_overview
+#| fig-cap: 'Table 1: Sample of doctor degree for each state'
+#| echo: false
+# use 'knitr' generate a table of cleaned data for overview
+knitr::kable(head(clean[, 1:2]), "simple",   col.names = c('ID', 'Counts'))
+
+```
+
+
+Then, we find the ratio for California, which has the ID 71 given by codebook. After that we calculate the ratio of doctoral degree respondents to total respondents in California by number of respondents with doctoral degrees in California divided by total number of respondents in California, which is given by the teacher(391,171). Then, use the ratio, we can calculate the number of respondents for every state by number of doctor degree divided by the ratio. See table 2 for overview of the estimated total respondents.
+
+```{r}
+#| label: dc_estimate
+#| fig-cap: 'Table 2: Sample of doctor degree for each state'
+#| echo: false
+doctoral_degrees_california <- clean %>%
+  filter(STATEICP == 71) %>%
+  pull(respondents) 
+total_respondents_california <- 391171
+ratio_california <- doctoral_degrees_california / total_respondents_california
+state_edu_data <- clean %>%
+  mutate(estimated_total_respondents = respondents / ratio_california)
+knitr::kable(head(state_edu_data[, 1:3]), "simple",   col.names = c('ID', 'Counts','Estimated'))
+```
+
+Then we compare with the actual number.
+```{r}
+#| label: dc_compare
+#| fig-cap: 'Table 3: Sample of estimate v.s. actula'
+#| echo: false
+actual_respondents <- raw %>%
+  group_by(STATEICP) %>%
+  summarise(actual_total_respondents = n())
+comparison_data <- state_edu_data %>%
+  left_join(actual_respondents, by = "STATEICP") 
+
+# Step 3: Calculate the difference between estimated and actual respondents
+comparison_data <- comparison_data %>%
+ select(STATEICP, respondents, estimated_total_respondents, actual_total_respondents)
+knitr::kable(head(comparison_data[, 1:4]), "simple",   col.names = c('ID', 'Counts','Estimated','Actual'))
+  
+```
+
+## Explaination of Difference
+The Laplace ratio estimator is based on the ratio of doctoral degree holders in California to the total respondents in California, applied to other states. This method assumes that the proportion of doctoral degree holders is similar across states, which may not always be true. 
+Each state has different demographics, education systems, and labor markets, leading to variations in educational attainment levels. For instance, states with a higher concentration of research institutions or universities may have more doctoral degree holders.
+If certain respondents in a state did not report their education level, this could lead to undercounts in the actual totals.
+The estimation assumes that the ratio of doctoral degree holders to total respondents is consistent across states. If certain states have unique educational trends or policies affecting the attainment of doctoral degrees, the estimate may not hold true.
